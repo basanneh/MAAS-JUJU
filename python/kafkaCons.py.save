@@ -1,0 +1,61 @@
+from kafka import KafkaConsumer
+import pickle
+import numpy as np
+import serial
+import ast
+import sys
+from matplotlib import pyplot as plt 
+from matplotlib.animation import FuncAnimation
+import time
+
+np.set_printoptions(threshold=sys.maxsize)
+
+def update_hist(num, data):
+  plt.cla()
+  plt.hist(data[num])
+
+if __name__ == '__main__':
+  consumer = KafkaConsumer('video_frame3', auto_offset_reset='earliest',
+                           bootstrap_servers=['localhost:9092'],
+                           api_version=(0, 10),
+                           consumer_timeout_ms=1000,
+                           key_deserializer=lambda item: item.decode('utf-8') ,
+                           value_deserializer=lambda item: item.decode('utf-8') ,
+
+  )
+
+for msg in consumer:
+  frameStr= msg.value
+  # print(frameStr)
+  # print(type(frameStr))
+  # framenp = np.array (ast.literal_eval(frameStr))
+  framenp  = eval ('np.array (' +  frameStr + ')')
+#  print(type(framenp))
+  #print(framenp)
+  print(framenp.shape)
+  print(framenp.size)
+  pltframenp.ravel(),256,[0,256])
+  plt.title("Histogram")
+  # You probably won't need this if you're embedding things in a tkinter plot...
+  #plt.ion()
+  fig, ax = plt.subplots()
+  #fig = plt.figure()
+  #ax = fig.add_subplot(111)
+  #fig.canvas.draw()
+  #fig.canvas.flush_events()
+  #plt.clf()
+  #plt.interactive(True)
+  plt.show(block=False)
+  plt.pause(30)
+  plt.close()
+  #plt.show(block=True)
+# plt.show(block = False)
+  # framenp = np.fromstring(frameStr, dtype=int, sep='],[')
+  # print(framenp)
+  # print(str_ascii.decode('framenp'))
+  # print(framenp)
+  # print(framenp.shape)
+  # print(framenp.size)
+
+# /https://www.reddit.com/r/Python/comments/44qkk5/how_to_convert_bytes_to_string_in_python/
+# /https://codeigo.com/python/convert-bytes-to-string

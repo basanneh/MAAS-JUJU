@@ -1,0 +1,42 @@
+#!/bin/bash
+######################################################################################
+# This script will install juju and the and perform the initial configurations needed#
+# The Prerequistes are for MAAS to be installed and configured first i.e Acquire and #
+# commision machines to maas.							     #
+######################################################################################
+
+################################# GLOBAL VARIABLES ###################################
+	read -p "Enter Cloud Name: " CLOUD  
+	read -p "Enter Hostname of the Controller :" HOSTNAME 
+	read -p "Enter Controller Name: " CONTROLLER
+	read -p "Enter Model Name: " MODEL 
+####################### Install Juju using snap #######################
+	sudo snap install juju --classic
+	sudo snap refresh juju --edge
+
+###################### Add clould Interactively .#########################
+########################### TO DO ########################################
+# We can add cloud(s) by using a YAML file e.g "maas-cloud.yaml" and run #
+# juju add-cloud --local <<cloud_name>> <<maas-cloud.yaml>>              #
+# but for now we will use the interactive mode.   		         #
+##########################################################################
+	
+	juju add-cloud --local $CLOUD cloud.yaml
+
+
+############################### Add Credentials ###########################
+	
+	echo "--------------------- Add Credentials ----------------------"
+	juju add-credential $CLOUD
+
+################ Create a controller on a specific Host ###################
+	echo "---------------------Create a Controller----------------------"
+	juju bootstrap $CLOUD $CONTROLLER --to $HOSTNAME
+
+
+################ Add Model To A Specific Controller ###################
+	juju add-model $MODEL -c $CONTROLLER
+
+#######################################################################
+#*****************************END OF SCRIPT***************************#
+#######################################################################

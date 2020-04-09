@@ -1,0 +1,127 @@
+#! /bin/bash
+
+##########################################################################
+# Script to update netplan to achieve static routing, uses CIDR notation #
+##########################################################################
+
+CONFIG_DIR="/etc/netplan/"
+BACKUP_LOCATION="/home/"
+
+function check_privileges {
+	if [[ "$EUID" -ne 0 ]]; then
+		echo "Only root can run this. Run again with sudo." 2>&1
+		exit 1
+	fi
+}
+
+function locate_check_config {
+	read -p "Enter the name of the config file (.yaml): " CONFIG_FILE
+	CONFIG="$CONFIG_DIR$CONFIG_FILE"
+	if [[ -f "$CONFIG" ]]; then
+		echo ""$CONFIG": "$'\u2714'""
+	else
+		echo -e ""$CONFIG" doesn't exist or check the path: "$'\u274c'""
+		exit 1
+	fi
+}
+
+function create_backup {
+	local BACKUP_FILE="$BACKUP_LOCATION""$CONFIG_FILE".bk_`date +%Y%m%d%H%M`
+	echo > "$BACKUP_FILE"
+	cp "$CONFIG" "$BACKUP_FILE"
+	echo "Backup created ("$BACKUP_FILE"): "$'\u2714'""
+}
+
+function get_interface_information {
+	echo "Select Interface One: "
+	mapfile -t INTERFACE_LIST < <(ls /sys/class/net)
+	select INTERFACE in "${INTERFACE_LIST[@]}"
+	do
+		INTERFACE_ONE=$INTERFACE
+		break
+	done
+	echo "Select Interface Two: "
+	select INTERFACE in "${INTERFACE_LIST[@]}"
+	do
+		INTERFACE_TWO=$INTERFACE
+		break
+	done
+	echo "==========INTERFACES======="
+	echo "Interface One: "$INTERFACE_ONE""
+	echo "Interface Two: "$INTERFACE_TWO""
+	echo "==========================="
+}
+
+function read_input {
+	read -p "Enter static IP (CIDR notation) for "$INTERFACE_ONE": " STATIC_IP_ONE
+	read -p "Enter gateway IP for "$INTERFACE_ONE": " GATEWAY_IP_ONE
+	read -p "Enter the IP of nameservers (seperated by comma) for "$INTERFACE_ONE": " NAMESERVERS_ONE
+	read -p "Enter the search domain for "$INTERFACE_ONE" nameserver: " DOMAIN
+	read -p "Enter static IP (CIDR notation) for "$INTERFACE_TWO": " STATIC_IP_TWO
+	read -p "Enter gateway IP for "$INTERFACE_TWO": " GATEWAY_IP_TWO
+}
+
+function print_routing_table {
+	echo -e "\n==========ROUTING TABLE====="
+	route -n
+}
+
+function check_connectivity {
+	ping -q -c 1 -W 1 8.8.8.8 > /dev/null 2>&1
+	if [[ "$?" -eq 0 ]]; then
+		echo -e "Network connectivity: "$'\u2714'""
+	else
+		echo -e "Network connectivity: "$'\u274c'""
+		exit 1
+	fi
+}
+
+function setup {
+	local END_CONFIG="network:\n"
+    	END_CONFIG+="    version: 2\n"
+	END_CONFIG+="    renderer: networkd\n"
+	END_CONFIG+="    ethernets:\n"
+	END_CONFIG+="        $INTERFACE_ONE:\n"
+	END_CONFIG+="            addresses: [ $STATIC_IP_ONE ]\n"
+	END_CONFIG+="            gateway4: $GATEWAY_IP_ONE\n"
+	END_CONFIG+="            nameservers:\n"
+	END_CONFIG+="                search: [ $DOMAIN ]\n"
+	END_CONFIG+="                addresses: [ $NAMESERVERS_ONE ]\n"
+	END_CONFIG+="            routes:\n"
+	END_CONFIG+="              - to: $STATIC_IP_ONE\n"
+	END_CONFIG+="                via: $GATEWAY_IP_ONE\n"
+	echo -e "$END_CONFIG" > "$CONFIG"
+	sudo netplan apply
+	if [[ "$?" -eq 0 ]]; then
+		echo "Netplan apply for "$INTERFACE_ONE": "$'\u2714'""
+	else
+		echo "Netplan apply for "$INTERFACE_ONE": "$'\u274c'""
+		exit 1
+	fi
+	check_connectivity
+	END_CONFIG+="        $INTERFACE_TWO:\n"
+	END_CONFIG+="            addresses: [ $STATIC_IP_TWO ]\n"
+	END_CONFIG+="            gateway4: $GATEWAY_IP_TWO\n"
+	END_CONFIG+="            routes:\n"
+	END_CONFIG+="              - to: $STATIC_IP_TWO \n"
+	END_CONFIG+="                via: $GATEWAY_IP_TWO\n"
+	echo -e "$END_CONFIG" > "$CONFIG"
+	sudo netplan apply
+	sudo netplan apply
+	if [[ "$?" -eq 0 ]]; then
+		echo "Netplan apply for "$INTERFACE_TWO": "$'\u2714'""
+	else
+		echo "Netplan apply for "$INTERFACE_TWO": "$'\u274c'""
+		exit 1
+	fi
+	check_connectivity
+	print_routing_table
+	echo -e "\n\n============FINISHED========\n"
+}
+
+check_privileges
+locate_check_config
+create_backup
+get_interface_information
+read_input
+setup

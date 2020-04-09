@@ -1,0 +1,21 @@
+#!/bin/bash
+#login to maas api as admin. This should be the second file to run
+# ./loginmaas 
+usage="$(basename "$0") [-h] -- program log in the maas api"
+PROFILE=admin
+API_KEY_FILE=/home/pordonez/bin/key
+#to save the apikey in a file for the first time uncoment 
+#sudo maas-region apikey --username=$PROFILE > $API_KEY_FILE
+login(){
+    MAAS_URL=http://localhost:5240/MAAS/api/2.0
+    maas login $PROFILE $MAAS_URL - < $API_KEY_FILE
+}
+while getopts "h" option; do
+	case "$option" in
+		"h") echo "$usage"
+			 exit
+			 ;;
+	esac
+done
+
+login

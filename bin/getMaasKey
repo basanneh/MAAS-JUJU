@@ -1,0 +1,18 @@
+#!/bin/bash
+# get maas key this should be the first script to launch
+# ./getMaasKey
+usage="$(basename "$0") [-h]  -- program to get maas key"
+PROFILE=admin
+API_KEY_FILE=key
+getkey(){
+    sudo maas-region apikey --username=$PROFILE > $API_KEY_FILE
+}
+while getopts "h" option; do
+	case "$option" in
+		"h") echo "$usage"
+			 exit
+			 ;;
+	esac
+done
+
+getkey

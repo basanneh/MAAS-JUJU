@@ -1,0 +1,39 @@
+#!/bin/bash
+
+#################################################################################################
+# This script will compose you a new pod from the list of kvm hosts avalaible on maas.          #
+# You can choose the host that you want the pod to be created at and also the specs i.e cores,  #
+# memory and also give it a hostname . example of a  pod with 4 cores, 1024Mb memory will be    #
+# maas $PROFILE pod compose $PODid memory=1024 cores=4 hostname="virtual1"                      #
+#################################################################################################
+API_KEY_FILE=api_key
+read -p "Enter username: " PROFILE
+
+#This function gets the apikey of the USER with username$PROFILE
+function getkey {
+	sudo maas-region apikey --username="$PROFILE" > "$API_KEY_FILE"
+}
+
+function login {
+
+# Possible bug profile name doesn't matter eg. your profile could be
+# xyz but as long as you have the right API_KEY_FILE you will be able
+# to interact with Maas
+	local MAAS_URL=http://localhost:5240/MAAS/api/2.0
+	maas login "$PROFILE" "$MAAS_URL" - < "$API_KEY_FILE"
+}
+
+function compose_pod {
+	maas admin pods read | jq -jr '.[] |.id, " "," ",.name ," ","\n"'	
+	echo "Enter 'q' to quit."
+	read -p "Enter the POD id of the host: " PODID
+	read -p "Enter the amount of memory in GB: " MEMORY
+	RAM = $((MEMORY*1024))
+        read -p "Number of cores: " CORES
+	read -p "Name: " HOSTNAME	
+	maas $PROFILE pod compose $PODID memory=$RAM cores=$CORES hostname=$HOSTNAME
+}
+getkey
+login
+compose_pod
+

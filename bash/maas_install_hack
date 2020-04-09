@@ -1,0 +1,47 @@
+#!/bin/bash
+#####################################################################################################
+# This script is to install maas and maas-cli with a superadmin user account with local SSH_Keys    #
+##################################################################################################### 
+
+read -p "Enter user: " PROFILE
+read -p "Please enter Email : " EMAIL
+read -p "Enter SSH Key : " KEY
+
+#MAAS URL 'localhost' means maas server is installed in the local machine 
+#it could be the ip address of the maas server if its not on the local machine.
+MAAS_URL="http://localhost:5240/MAAS/api/2.0"
+
+function basic_install {
+	#Install the python3, pip3, jq, maas, and init maas 
+	sudo apt-get update
+	sudo apt-get install python3 jq python3-pip -yy
+
+	sudo apt-add-repository -yu ppa:maas/2.6
+	sudo apt install maas
+	sudo maas init
+} 
+
+function create_admin_user {
+	#Create a maas admin account after getting the username and email provided by the user
+	sudo maas createadmin --username=$PROFILE --email=$EMAIL
+
+	#After creating a new admin user, this function is called to update
+	#the tables in the 'maasdb' database to add the a new field
+        #into the 'maasserver_sshkey' table with the ssh-key provided
+        #and the user_id as the foreign key to the 'auth_user' table. 
+	sudo -u postgres psql postgres -d maasdb -c " 
+	update maasserver_userprofile set completed_intro ='true' where user_id =(select id from auth_user where username='$PROFILE'); 
+	insert into maasserver_sshkey(created,updated,key,user_id,keysource_id) VALUES (current_timestamp,current_timestamp,$KEY,
+	(select id from auth_user where username='$PROFILE'),null);"
+
+}
+
+function maascli_install {
+	#Install Maas-cli
+	sudo apt install maas-cli
+}
+
+basic_install
+create_admin_user
+maascli_install
+

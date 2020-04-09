@@ -1,0 +1,37 @@
+#!/bin/bash
+# get the maas id and names of bare metal machines including the host of maas and
+# the maas id and names of the virtual machines created by maas
+# and output to a file systemIdMaas
+# ./getSystemIdMaas
+usage="$(basename "$0") [-h]  -- program to get maas Ids"
+
+getIdsMaas(){
+    PROFILE=admin
+    mapfile -t HOSTNAMES < <(maas $PROFILE nodes read | grep hostname | cut -d '"' -f 4)
+    
+    i=0
+    for hostname in "${HOSTNAMES[@]}"
+    do
+        SYSTEMS_ID[$i]=$(maas $PROFILE nodes read \
+		                      hostname="${hostname}" \
+		                     | grep system_id -m 1 | cut -d '"' -f 4)
+        i=$(($i+1))
+    done
+
+
+    for index in ${!HOSTNAMES[*]};
+    do
+        echo "${HOSTNAMES[$index]} : ${SYSTEMS_ID[$index]}"
+        echo "${HOSTNAMES[$index]} : ${SYSTEMS_ID[$index]}" >> systemIdsMaas.txt
+    done
+}
+    
+while getopts "h" option; do
+	case "$option" in
+		"h") echo "$usage"
+			 exit
+			 ;;
+	esac
+done
+
+getIdsMaas

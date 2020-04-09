@@ -1,0 +1,74 @@
+#!/bin/bash
+####################################################################################
+# Run this script to Deploy the machines,set kvm="true"				   #
+# that have already been commisioned    					   #
+# and there status is set to ready(4) .						   #
+####################################################################################
+
+API_KEY_FILE=api_key
+read -p "Enter username: " PROFILE
+
+#This function gets the apikey of the USER with username$PROFILE
+function getkey {
+        sudo maas-region apikey --username="$PROFILE" > "$API_KEY_FILE"
+}
+
+function login {
+
+        # Possible bug profile name doesn't matter eg. your profile could be
+        # xyz but as long as you have the right API_KEY_FILE you will be able
+        # to interact with Maas
+        local MAAS_URL=http://localhost:5240/MAAS/api/2.0
+        maas login "$PROFILE" "$MAAS_URL" - < "$API_KEY_FILE"
+}
+
+function deploy_machine {
+	 while true; do
+                #fetch systems with status ready to be deployed
+                local STATUS_READY=4
+		echo -e " List of Machine(s) that would be deployed. "
+		local SYSTEM_IDS=(`maas "$PROFILE" machines read | \
+                        jq -r '.[] | select(.status=='"$STATUS_READY"')| .system_id'`)
+
+
+
+               #local SYSTEM_IDS=( `maas "$PROFILE" machines read | \
+		#	jq -r '.[] | select(.status=='"$STATUS_READY"')| .hostname'`)
+                select ID in "${SYSTEM_IDS[@]}" "Quit";
+                do
+                        case $ID in
+                                "Quit") break 2 ;;
+                        esac
+                        SYSTEM_ID=$ID
+                        break
+                done
+                read -p "KVM: (y/n)?: " KVM_STATUS
+
+                if [[ "$KVM_STATUS" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+                        KVM=true
+                else
+                        KVM=false
+                fi
+
+
+                echo -e "---------------DEPLOYMENT IN PROGRESS ----------------------"       
+                maas admin machine deploy "$SYSTEM_ID" install_kvm="$KVM"
+
+                #prompt if we need to do more deployment
+                echo "Done?"
+                select OPT in "Yes" "No";
+                do
+                        case $REPLY in
+                                1) break 2 ;;
+                                2) break ;;
+                                *) echo "Invalid input" >&2
+                        esac
+                done
+        done
+
+
+}
+
+getkey
+login
+deploy_machine

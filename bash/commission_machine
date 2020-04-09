@@ -1,0 +1,85 @@
+#!/bin/bash
+
+#################################################################################################
+# Run this file every time a new node has been added to maas via PXE boot.			#
+# In this file, you will be able to Rename the new node to your desired HOSTNAME, commision	#
+# it, and also deploy an operating system on it with KVM.					#
+# This script only performs the above function one machine at time so that you will be able to  #
+# know the machine you're working on. You can also see the table associated with the nodes in	#
+# the postgres database by querying the 'maasserver_node' table.				#
+#################################################################################################
+
+API_KEY_FILE=api_key
+read -p "Enter username: " PROFILE
+
+#This function gets the apikey of the USER with username$PROFILE
+function getkey {
+	sudo maas-region apikey --username="$PROFILE" > "$API_KEY_FILE"
+}
+
+function login {
+
+	# Possible bug profile name doesn't matter eg. your profile could be
+	# xyz but as long as you have the right API_KEY_FILE you will be able
+	# to interact with Maas
+	local MAAS_URL=http://localhost:5240/MAAS/api/2.0
+	maas login "$PROFILE" "$MAAS_URL" - < "$API_KEY_FILE"
+}
+
+function rename_commision {
+
+	while true; do
+		#fetch systems with status ready to be deployed
+		local STATUS_READY=0
+		#TODO: better display of what's being commissioned
+		local SYSTEM_IDS=(`maas "$PROFILE" machines read | \
+			jq -r '.[] | select(.status=='"$STATUS_READY"')| .system_id'`) 
+		#prompt to choose the specific machine to rename
+		echo "Select the machine to rename and commission: "
+		select ID in "${SYSTEM_IDS[@]}" "Quit";
+		do
+			case $ID in
+				"Quit") break 2 ;;
+			esac
+			SYSTEM_ID=$ID
+			break
+		done
+		echo -e "------Commissioning "$SYSTEM_ID"------"
+		read -p "Enter the name for the machine: " HOSTNAME
+		read -p "KVM: (y/n)?: " KVM_STATUS
+
+		if [[ "$KVM_STATUS" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+			KVM=true
+		else
+			KVM=false
+		fi
+
+		# TODO: additional checks??? Display how it is getting commisioned ????
+		maas "$PROFILE" machine update "$SYSTEM_ID" hostname="$HOSTNAME"
+	
+		echo -e "---------------COMMISSIONING IN PROGRESS ----------------------"	
+		#TODO: any way to check if it failed? CHECK STATUS AGAIN???
+		maas "$PROFILE" machine commission "$SYSTEM_ID" > /dev/null 2>&1
+		#TODO: separate this out
+		#maas admin machine deploy "$SYSTEM_ID" install_kvm="$KVM"
+
+		#prompt if we need to do more renaming and commisioning
+		echo "Done?"
+		select OPT in "Yes" "No";
+		do
+			case $REPLY in
+				1) break 2 ;;
+				2) break ;;
+				*) echo "Invalid input" >&2
+			esac
+		done
+	done
+
+#	'''maas $USERNAME machine update $SYSTEM_ID hostname=$HOSTNAME
+#	maas $USERNAME machine commission $SYSTEM_ID && maas $USERNAME machine deploy $SYSTEM_ID install_kvm=True'''
+}
+
+getkey
+login
+rename_commision
+
